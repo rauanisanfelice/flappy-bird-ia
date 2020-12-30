@@ -1,4 +1,4 @@
-import pygame, random
+import pygame, random, pygame_menu
 from pygame.locals import *
 
 SCREEN_WIDTH = 400
@@ -7,13 +7,17 @@ SCREEN_HEIGHT = 600
 GROUND_WIDTH = SCREEN_WIDTH * 2
 GROUND_HEIGHT = 100
 
-PIPE_WIDTH = 80
+PIPE_WIDTH = 70
 PIPE_HEIGHT = 500
-PIPE_GAP = 150
+PIPE_GAP_LEVEL = [200, 130, 60]
+PIPE_GAP = PIPE_GAP_LEVEL[0]
 
 SPEED = 10
 GAME_SPEED = 10
 GRAVITY = 1
+
+COLOR_BLACK = (0, 0, 0)
+COLOR_RED = (255, 0, 0)
 
 IMG_BASE = 'assets/base.png'
 IMG_BACKGROUND = 'assets/background-day.png'
@@ -69,9 +73,20 @@ class Bird(pygame.sprite.Sprite):
         self.speed = -SPEED
 
 
-class Ground(pygame.sprite.Sprite):
+class Scenario(object):
+
+    def __init__(self):
+        super().__init__()
     
-    def __init__(self, xpos):
+    def is_off_screen(self):
+        """Função que valida se o sprite esta fora da tela"""
+
+        return self.rect[0] < -(self.rect[2])
+
+
+class Ground(pygame.sprite.Sprite, Scenario):
+    
+    def __init__(self, xpos=GROUND_WIDTH):
         """ Funcao de propriedades do Fundo.'"""
         
         pygame.sprite.Sprite.__init__(self)
@@ -83,12 +98,12 @@ class Ground(pygame.sprite.Sprite):
         self.rect = self.image.get_rect()
         self.rect[0] = xpos
         self.rect[1] = SCREEN_HEIGHT - GROUND_HEIGHT
-
+    
     def update(self):
         self.rect[0] -= GAME_SPEED
 
 
-class Pipe(pygame.sprite.Sprite):
+class Pipe(pygame.sprite.Sprite, Scenario):
 
     def __init__(self, xpos, ysize, inverted=False):
         """ Funcao de propriedades do Canos.'"""
@@ -113,16 +128,11 @@ class Pipe(pygame.sprite.Sprite):
         self.rect[0] -= GAME_SPEED
 
 
-def is_off_screen(sprite):
-    """Função que valida se o sprite esta fora da tela"""
-
-    return sprite.rect[0] < -(sprite.rect[2])
-
-
 def get_random_pipes(xpos):
     """Gera canos aleatorios"""
-
-    size = random.randint(100, 300)
+    
+    global PIPE_GAP
+    size = random.randint(110, 350)
     
     pipe = Pipe(xpos, size)
     pipe_inverted = Pipe(xpos, SCREEN_HEIGHT - size - PIPE_GAP, True)
@@ -130,82 +140,116 @@ def get_random_pipes(xpos):
     return (pipe, pipe_inverted)
 
 
-# INICIA JOGO COM SCREEN
-pygame.init()
-screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+# DIFICULDADE DO JOGO
+def set_difficulty(value, difficulty):
+    global PIPE_GAP
+    PIPE_GAP = PIPE_GAP_LEVEL[difficulty]
 
-# INICIA BIRD
-bird_group = pygame.sprite.Group()
-bird = Bird()
-bird_group.add(bird)
 
-# INICIA GROUND
-ground_group = pygame.sprite.Group()
-for i in range(2):
-    ground = Ground(GROUND_WIDTH * i)
-    ground_group.add(ground)
-
-# INICIA PIPE
-pipe_group = pygame.sprite.Group()
-for i in range(2):
-    pipes = get_random_pipes(SCREEN_WIDTH * i + 800)
-    pipe_group.add(pipes[0])
-    pipe_group.add(pipes[1])
-
-# FPS
-clock = pygame.time.Clock()
-
-while True:
+# GAME
+def start_the_game():
     
-    # 30 FPS
-    clock.tick(30)
+    distancia_total = 0
 
-    # VERIFICA EVENTOS
-    for event in pygame.event.get():
-        if event.type == QUIT:
-            pygame.quit()
-        
-        if event.type == KEYDOWN:
-            if event.key == K_SPACE:
-                bird.bump()
+    # INICIA BIRD
+    bird_group = pygame.sprite.Group()
+    bird = Bird()
+    bird_group.add(bird)
+
+    # INICIA GROUND
+    ground_group = pygame.sprite.Group()
+    for i in range(2):
+        ground = Ground(GROUND_WIDTH * i)
+        ground_group.add(ground)
     
-    # INICIA TELA
-    screen.blit(BACKGOUND, (0, 0))
-    
-    # VERIFCA SE O GROUND SAIU DA TELA
-    if is_off_screen(ground_group.sprites()[0]): 
-        ground_group.remove(ground_group.sprites()[0])
-
-        new_ground = Ground(GROUND_WIDTH - 20)
-        ground_group.add(new_ground)
-
-    # VERIFCA SE O PIPE SAIU DA TELA
-    if is_off_screen(pipe_group.sprites()[0]):
-        pipe_group.remove(pipe_group.sprites()[0])
-        pipe_group.remove(pipe_group.sprites()[0])
-
-        pipes = get_random_pipes(SCREEN_WIDTH * 2)
-
+    # INICIA PIPE
+    pipe_group = pygame.sprite.Group()
+    for i in range(2):
+        pipes = get_random_pipes(SCREEN_WIDTH * i + 500)
         pipe_group.add(pipes[0])
         pipe_group.add(pipes[1])
 
-    # MOSTRA O BIRD
-    bird_group.update()
-    bird_group.draw(screen)
-
-    # MOSTRA O PIP
-    pipe_group.update()
-    pipe_group.draw(screen)
+    # FPS
+    clock = pygame.time.Clock()
     
-    # MOSTRA O GROUND
-    ground_group.update()
-    ground_group.draw(screen)
+    while True:
+        
+        # 30 FPS  
+        clock.tick(30)
+        
+        # VERIFICA EVENTOS
+        for event in pygame.event.get():
+            # SAIR
+            if event.type == QUIT:
+                pygame.quit()
+            
+            # VOAR
+            if event.type == KEYDOWN:
+                if event.key == K_SPACE:
+                    bird.bump()
+        
+        # INICIA TELA
+        screen.blit(BACKGOUND, (0, 0))
+        
+        # VERIFCA SE O GROUND SAIU DA TELA
+        if ground_group.sprites()[0].is_off_screen():
+            ground_group.remove(ground_group.sprites()[0])
 
-    # VALIDA COLISAO COM O CHAO
-    if (pygame.sprite.groupcollide(bird_group, ground_group, False, False, pygame.sprite.collide_mask) or
-        pygame.sprite.groupcollide(bird_group, pipe_group, False, False, pygame.sprite.collide_mask)):
-        # TODO Game Over
-        break
+            new_ground = Ground(GROUND_WIDTH - 20)
+            ground_group.add(new_ground)
 
-    # ATUALIZA DA TELA
-    pygame.display.update()
+        # VERIFCA SE O PIPE SAIU DA TELA
+        if pipe_group.sprites()[0].is_off_screen():
+            pipe_group.remove(pipe_group.sprites()[0])
+            pipe_group.remove(pipe_group.sprites()[0])
+
+            pipes = get_random_pipes(SCREEN_WIDTH * 2)
+
+            pipe_group.add(pipes[0])
+            pipe_group.add(pipes[1])
+
+        # ATUALIZA GROUPS
+        bird_group.update()
+        pipe_group.update()
+        ground_group.update()
+
+        # DESENHA GROUPS
+        bird_group.draw(screen)
+        pipe_group.draw(screen)
+        ground_group.draw(screen)
+
+        # INFORMACOES
+        rect = pygame.draw.rect(screen, (COLOR_BLACK), (5, 5, 170, 70), 2)
+        pygame.display.set_caption('Box Test')
+        font = pygame.font.SysFont('Arial', 20)
+        altura = (SCREEN_HEIGHT - GROUND_HEIGHT) - bird_group.sprites()[0].rect[1]
+        if (pipe_group.sprites()[0].rect[0] - bird_group.sprites()[0].rect[0]) > 0:
+            distancia = pipe_group.sprites()[0].rect[0] - bird_group.sprites()[0].rect[0]
+        else: 
+            distancia = pipe_group.sprites()[2].rect[0] - bird_group.sprites()[0].rect[0]
+        
+        distancia_total += GAME_SPEED
+        screen.blit(font.render(f'Altura: {altura}', True, COLOR_RED), (15, 10))
+        screen.blit(font.render(f'Distancia: {distancia}', True, COLOR_RED), (15, 35))
+        screen.blit(font.render(f'Score: {distancia_total}', True, COLOR_RED), (15, 55))
+
+        # VALIDA COLISAO COM O CHAO
+        if (pygame.sprite.groupcollide(bird_group, ground_group, False, False, pygame.sprite.collide_mask) or
+            pygame.sprite.groupcollide(bird_group, pipe_group, False, False, pygame.sprite.collide_mask)):
+            break
+
+        # ATUALIZA DA TELA
+        pygame.display.update()
+
+
+# INICIA JOGO COM SCREEN
+pygame.init()
+screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+pygame.display.set_caption('Box Test')
+
+# MENU
+menu = pygame_menu.Menu(SCREEN_HEIGHT, SCREEN_WIDTH, 'Bem Vindo(a)!', theme=pygame_menu.themes.THEME_GREEN)
+menu.add_selector('Dificuldade :', [('Fácil', 0), ('Normal', 1), ('Difícil', 2)], onchange=set_difficulty)
+menu.add_button('Jogar', start_the_game)
+menu.add_button('Sair', pygame_menu.events.EXIT)
+menu.mainloop(screen)
