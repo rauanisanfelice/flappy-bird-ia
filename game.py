@@ -15,12 +15,12 @@ SPEED = 10
 GAME_SPEED = 10
 GRAVITY = 1
 
-IMG_BASE = 'base.png'
-IMG_BACKGROUND = 'background-day.png'
-IMG_BIRD_MIDFLAP = 'bluebird-midflap.png'
-IMG_BIRD_UPFLAP = 'bluebird-upflap.png'
-IMG_BIRD_DOWNFLAP = 'bluebird-downflap.png'
-IMG_PIPE = 'pipe-red.png'
+IMG_BASE = 'assets/base.png'
+IMG_BACKGROUND = 'assets/background-day.png'
+IMG_BIRD_MIDFLAP = 'assets/bluebird-midflap.png'
+IMG_BIRD_UPFLAP = 'assets/bluebird-upflap.png'
+IMG_BIRD_DOWNFLAP = 'assets/bluebird-downflap.png'
+IMG_PIPE = 'assets/pipe-red.png'
 
 # CRIA BACKGROUND E DEIXA DO TAMANHO DA TELA
 BACKGOUND = pygame.image.load(IMG_BACKGROUND)
@@ -193,13 +193,13 @@ while True:
     bird_group.update()
     bird_group.draw(screen)
 
-    # MOSTRA O GROUND 
-    ground_group.update()
-    ground_group.draw(screen)
-
     # MOSTRA O PIP
     pipe_group.update()
     pipe_group.draw(screen)
+    
+    # MOSTRA O GROUND
+    ground_group.update()
+    ground_group.draw(screen)
 
     # VALIDA COLISAO COM O CHAO
     if (pygame.sprite.groupcollide(bird_group, ground_group, False, False, pygame.sprite.collide_mask) or
