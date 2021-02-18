@@ -1,4 +1,11 @@
-import pygame, random, pygame_menu
+import pygame, random, pygame_menu, warnings
+import numpy as np
+import pandas as pd
+
+from sklearn import neural_network, metrics
+from sklearn.model_selection import train_test_split
+from sklearn.exceptions import ConvergenceWarning
+
 from pygame.locals import *
 
 SCREEN_WIDTH = 400
@@ -14,7 +21,7 @@ PIPE_GAP = PIPE_GAP_LEVEL[0]
 
 SPEED = 10
 GAME_SPEED = 10
-GRAVITY = 1
+GRAVITY = 0.05
 
 COLOR_BLACK = (0, 0, 0)
 COLOR_RED = (255, 0, 0)
@@ -117,7 +124,7 @@ class Pipe(pygame.sprite.Sprite, Scenario):
         self.rect[0] = xpos
 
         if inverted:
-            self.image =pygame.transform.flip(self.image, False, True)
+            self.image = pygame.transform.flip(self.image, False, True)
             self.rect[1] = - (self.rect[3] - ysize)
         
         else:
@@ -126,6 +133,43 @@ class Pipe(pygame.sprite.Sprite, Scenario):
 
     def update(self):
         self.rect[0] -= GAME_SPEED
+
+
+class MyMLPRegressor(object):
+    
+    def __init__(self):
+
+        self.X_train = None
+        self.X_test = None
+        self.Y_train = None
+        self.Y_test = None
+        self.mlp = neural_network.MLPRegressor(hidden_layer_sizes=3)
+
+    def train_test(self, data, test_size:float=0.25, random_state:int=1):
+
+        self.X_train, self.X_test, self.Y_train, self.Y_test = train_test_split(
+            data.iloc[:,0:3],
+            data.iloc[:,3],
+            test_size=test_size,
+            random_state=random_state
+        )
+
+    def fit(self):
+        
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=ConvergenceWarning, module="sklearn")
+            
+            self.mlp.fit(self.X_train, self.Y_train)
+    
+    def predict(self, data):
+
+        self.pre_test_y = self.mlp.predict(data)
+
+    def score(self):
+
+        test_score = metrics.mean_squared_error(self.Y_test, self.pre_test_y, multioutput='uniform_average')
+        print("mean absolute error:", round(test_score, 2))
+        
 
 
 def get_random_pipes(xpos):
@@ -208,6 +252,29 @@ def start_the_game():
             pipe_group.add(pipes[0])
             pipe_group.add(pipes[1])
 
+        # INFORMACOES
+        rect = pygame.draw.rect(screen, (COLOR_BLACK), (5, 5, 170, 85), 2)
+        pygame.display.set_caption('Box Test')
+        font = pygame.font.SysFont('Arial', 20)
+        altura = (SCREEN_HEIGHT - GROUND_HEIGHT) - bird_group.sprites()[0].rect[1] - bird.image.get_rect().height
+        if (pipe_group.sprites()[0].rect[0] - bird_group.sprites()[0].rect[0]) > 0:
+            distancia = pipe_group.sprites()[0].rect[0] - bird_group.sprites()[0].rect[0]
+            center_pipe = (pipe_group.sprites()[1].rect[1] + pipe_group.sprites()[1].rect[3]) + (PIPE_GAP / 2)
+        else: 
+            distancia = pipe_group.sprites()[2].rect[0] - bird_group.sprites()[0].rect[0]
+            center_pipe = (pipe_group.sprites()[3].rect[1] + pipe_group.sprites()[3].rect[3]) + (PIPE_GAP / 2)
+        
+        distancia_total += GAME_SPEED
+        screen.blit(font.render(f'Altura: {altura}', True, COLOR_RED), (15, 10))
+        screen.blit(font.render(f'Distancia: {distancia}', True, COLOR_RED), (15, 30))
+        screen.blit(font.render(f'Centro: {center_pipe}', True, COLOR_RED), (15, 50))
+        screen.blit(font.render(f'Score: {distancia_total}', True, COLOR_RED), (15, 70))
+
+        mlp.predict(pd.DataFrame([[altura, distancia, center_pipe]], columns=['altura','distancia','centerpipe']))
+        if int(round(mlp.pre_test_y[0], 0)) > 0:
+            print('Pula')
+            bird.bump()
+
         # ATUALIZA GROUPS
         bird_group.update()
         pipe_group.update()
@@ -218,22 +285,7 @@ def start_the_game():
         pipe_group.draw(screen)
         ground_group.draw(screen)
 
-        # INFORMACOES
-        rect = pygame.draw.rect(screen, (COLOR_BLACK), (5, 5, 170, 70), 2)
-        pygame.display.set_caption('Box Test')
-        font = pygame.font.SysFont('Arial', 20)
-        altura = (SCREEN_HEIGHT - GROUND_HEIGHT) - bird_group.sprites()[0].rect[1]
-        if (pipe_group.sprites()[0].rect[0] - bird_group.sprites()[0].rect[0]) > 0:
-            distancia = pipe_group.sprites()[0].rect[0] - bird_group.sprites()[0].rect[0]
-        else: 
-            distancia = pipe_group.sprites()[2].rect[0] - bird_group.sprites()[0].rect[0]
-        
-        distancia_total += GAME_SPEED
-        screen.blit(font.render(f'Altura: {altura}', True, COLOR_RED), (15, 10))
-        screen.blit(font.render(f'Distancia: {distancia}', True, COLOR_RED), (15, 35))
-        screen.blit(font.render(f'Score: {distancia_total}', True, COLOR_RED), (15, 55))
-
-        # VALIDA COLISAO COM O CHAO
+        # VALIDA COLISAO COM O CHAO / PIPE
         if (pygame.sprite.groupcollide(bird_group, ground_group, False, False, pygame.sprite.collide_mask) or
             pygame.sprite.groupcollide(bird_group, pipe_group, False, False, pygame.sprite.collide_mask)):
             break
@@ -241,6 +293,14 @@ def start_the_game():
         # ATUALIZA DA TELA
         pygame.display.update()
 
+# REDE NEURAL
+data = []
+for i  in range(0, 100, 1):
+    data.append([random.randint(1,500), random.randint(1,300), random.randint(110, 350), random.randint(0,1)])
+
+mlp = MyMLPRegressor()
+mlp.train_test(pd.DataFrame(data, columns=['altura','distancia','centerpipe','acao']))
+mlp.fit()
 
 # INICIA JOGO COM SCREEN
 pygame.init()
