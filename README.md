@@ -31,5 +31,5 @@ pip instal -r requirements.txt
 
 ### Executando o jogo
 ```
-python ./flappy.py
+python ./game.py
 ```
