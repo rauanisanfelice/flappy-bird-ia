@@ -1,2 +1,4 @@
 pygame==2.0.1
 pygame-menu==3.3.2
+scikit-learn==0.24.1
+pandas==1.2.2
