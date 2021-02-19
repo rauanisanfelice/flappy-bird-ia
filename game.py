@@ -1,10 +1,11 @@
-import pygame, random, pygame_menu, warnings
+import pygame, random, pygame_menu, warnings, pickle, datetime
 import numpy as np
 import pandas as pd
 
 from sklearn import neural_network, metrics
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, cross_val_score, cross_validate
 from sklearn.exceptions import ConvergenceWarning
+from sklearn.utils import shuffle
 
 from pygame.locals import *
 
@@ -21,7 +22,7 @@ PIPE_GAP = PIPE_GAP_LEVEL[0]
 
 SPEED = 10
 GAME_SPEED = 10
-GRAVITY = 0.05
+GRAVITY = 1
 
 COLOR_BLACK = (0, 0, 0)
 COLOR_RED = (255, 0, 0)
@@ -37,6 +38,12 @@ IMG_PIPE = 'assets/pipe-red.png'
 BACKGOUND = pygame.image.load(IMG_BACKGROUND)
 BACKGOUND = pygame.transform.scale(BACKGOUND, (SCREEN_WIDTH, SCREEN_HEIGHT))
 
+ERROS = 0
+BEST_SCORE = 120
+BEST_PIPES = 0
+GAMES_PLAY = 1
+FILENAME_MODEL = 'models/model.sav'
+HISTORICO_MELHORES = []
 
 class Bird(pygame.sprite.Sprite):
     
@@ -135,21 +142,26 @@ class Pipe(pygame.sprite.Sprite, Scenario):
         self.rect[0] -= GAME_SPEED
 
 
-class MyMLPRegressor(object):
+class MyMLPClassifier(object):
     
     def __init__(self):
-
+        
+        self.data = None
         self.X_train = None
         self.X_test = None
         self.Y_train = None
         self.Y_test = None
-        self.mlp = neural_network.MLPRegressor(hidden_layer_sizes=3)
+        self.predict_y = None
+        self.mlp = neural_network.MLPClassifier(hidden_layer_sizes=2, max_iter=500)
 
-    def train_test(self, data, test_size:float=0.25, random_state:int=1):
+    def set_data(self, data):
+        self.data = data
+    
+    def train_test(self, test_size:float=0.3, random_state:int=1):
 
         self.X_train, self.X_test, self.Y_train, self.Y_test = train_test_split(
-            data.iloc[:,0:3],
-            data.iloc[:,3],
+            self.data.iloc[:,0:3],
+            self.data.iloc[:,3],
             test_size=test_size,
             random_state=random_state
         )
@@ -163,13 +175,23 @@ class MyMLPRegressor(object):
     
     def predict(self, data):
 
-        self.pre_test_y = self.mlp.predict(data)
+        self.predict_y = self.mlp.predict(data)
 
     def score(self):
 
-        test_score = metrics.mean_squared_error(self.Y_test, self.pre_test_y, multioutput='uniform_average')
+        test_score = metrics.mean_squared_error(self.Y_test, self.predict_y, multioutput='uniform_average')
         print("mean absolute error:", round(test_score, 2))
-        
+    
+    def saveModel(self):
+        pickle.dump(self.mlp, open(FILENAME_MODEL, 'wb'))
+        pickle.dump(self.mlp, open(f"models/model-{datetime.datetime.now().strftime('%Y%m%d%H%m%S')}.sav", 'wb'))
+
+    def cross_validate(self, return_train_score=False):
+        print(cross_validate(
+            self.mlp,
+            self.X_test,
+            self.Y_test,
+            return_train_score=return_train_score,))
 
 
 def get_random_pipes(xpos):
@@ -193,7 +215,9 @@ def set_difficulty(value, difficulty):
 # GAME
 def start_the_game():
     
-    distancia_total = 0
+    global BEST_SCORE, ERROS, GAMES_PLAY, HISTORICO_MELHORES, BEST_PIPES
+    distancia_total = pipes_count = 0
+    historico = []
 
     # INICIA BIRD
     bird_group = pygame.sprite.Group()
@@ -244,6 +268,7 @@ def start_the_game():
 
         # VERIFCA SE O PIPE SAIU DA TELA
         if pipe_group.sprites()[0].is_off_screen():
+            
             pipe_group.remove(pipe_group.sprites()[0])
             pipe_group.remove(pipe_group.sprites()[0])
 
@@ -253,27 +278,38 @@ def start_the_game():
             pipe_group.add(pipes[1])
 
         # INFORMACOES
-        rect = pygame.draw.rect(screen, (COLOR_BLACK), (5, 5, 170, 85), 2)
+        rect = pygame.draw.rect(screen, (COLOR_BLACK), (5, 5, 185, 175), 2)
         pygame.display.set_caption('Box Test')
         font = pygame.font.SysFont('Arial', 20)
         altura = (SCREEN_HEIGHT - GROUND_HEIGHT) - bird_group.sprites()[0].rect[1] - bird.image.get_rect().height
         if (pipe_group.sprites()[0].rect[0] - bird_group.sprites()[0].rect[0]) > 0:
+            pass_pipe = False
             distancia = pipe_group.sprites()[0].rect[0] - bird_group.sprites()[0].rect[0]
             center_pipe = (pipe_group.sprites()[1].rect[1] + pipe_group.sprites()[1].rect[3]) + (PIPE_GAP / 2)
-        else: 
+        
+        else:
+            
+            if not pass_pipe:
+                pass_pipe = True
+                pipes_count += 1
+
             distancia = pipe_group.sprites()[2].rect[0] - bird_group.sprites()[0].rect[0]
             center_pipe = (pipe_group.sprites()[3].rect[1] + pipe_group.sprites()[3].rect[3]) + (PIPE_GAP / 2)
-        
+
         distancia_total += GAME_SPEED
         screen.blit(font.render(f'Altura: {altura}', True, COLOR_RED), (15, 10))
         screen.blit(font.render(f'Distancia: {distancia}', True, COLOR_RED), (15, 30))
         screen.blit(font.render(f'Centro: {center_pipe}', True, COLOR_RED), (15, 50))
         screen.blit(font.render(f'Score: {distancia_total}', True, COLOR_RED), (15, 70))
+        screen.blit(font.render(f'Pipe: {pipes_count}', True, COLOR_RED), (15, 90))
+        screen.blit(font.render(f'Best Score: {BEST_SCORE}', True, COLOR_RED), (15, 110))
+        screen.blit(font.render(f'Best Pipes: {BEST_PIPES}', True, COLOR_RED), (15, 130))
+        screen.blit(font.render(f'Jogos: {GAMES_PLAY}', True, COLOR_RED), (15, 150))
 
         mlp.predict(pd.DataFrame([[altura, distancia, center_pipe]], columns=['altura','distancia','centerpipe']))
-        if int(round(mlp.pre_test_y[0], 0)) > 0:
-            print('Pula')
+        if mlp.predict_y[0] == 1:
             bird.bump()
+        historico.append([altura, distancia, center_pipe, mlp.predict_y[0]])
 
         # ATUALIZA GROUPS
         bird_group.update()
@@ -288,18 +324,63 @@ def start_the_game():
         # VALIDA COLISAO COM O CHAO / PIPE
         if (pygame.sprite.groupcollide(bird_group, ground_group, False, False, pygame.sprite.collide_mask) or
             pygame.sprite.groupcollide(bird_group, pipe_group, False, False, pygame.sprite.collide_mask)):
+            
+            if distancia_total > BEST_SCORE:
+                
+                ERROS = 0
+                BEST_SCORE = distancia_total
+                BEST_PIPES = pipes_count
+
+                mlp.set_data(pd.DataFrame(historico, columns=['altura','distancia','centerpipe','acao']))
+                mlp.train_test()
+                mlp.fit()
+                
+                if BEST_PIPES >= 1:
+                    HISTORICO_MELHORES.append(historico)
+                    mlp.saveModel()
+            
+            else:
+                if ERROS > 10:
+                    ERROS = 0
+                    pd1 = pdGeral = None
+                    if HISTORICO_MELHORES:
+                        for i in HISTORICO_MELHORES:
+                            if pdGeral is None:
+                                pdGeral = pd.DataFrame(i, columns=['altura','distancia','centerpipe','acao'])
+                            else:
+                                pd1 = pd.DataFrame(i, columns=['altura','distancia','centerpipe','acao'])
+                                pdGeral.append(pd1)
+
+                        mlp.set_data(pd.DataFrame(pdGeral, columns=['altura','distancia','centerpipe','acao']))
+                        mlp.train_test()
+                        mlp.fit()
+                    else:
+                        try:
+                            mlp.mlp = pickle.load(open(FILENAME_MODEL, 'rb'))
+                        except:
+                            pass
+                
+                else:
+                    mlp.train_test(random_state=random.randint(0, 200))
+                    mlp.fit()
+
+                ERROS += 1
+
+            GAMES_PLAY += 1
             break
 
         # ATUALIZA DA TELA
         pygame.display.update()
 
+
 # REDE NEURAL
 data = []
 for i  in range(0, 100, 1):
-    data.append([random.randint(1,500), random.randint(1,300), random.randint(110, 350), random.randint(0,1)])
+    data.append([random.randint(1,500), random.randint(1,300), random.randint(110, 350), random.randint(0, 1)])
 
-mlp = MyMLPRegressor()
-mlp.train_test(pd.DataFrame(data, columns=['altura','distancia','centerpipe','acao']))
+mlp = MyMLPClassifier()
+mlp.set_data(pd.DataFrame(data, columns=['altura','distancia','centerpipe','acao']))
+mlp.train_test()
 mlp.fit()
 
 # INICIA JOGO COM SCREEN
@@ -307,9 +388,12 @@ pygame.init()
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption('Box Test')
 
+while True:
+    start_the_game()
+
 # MENU
-menu = pygame_menu.Menu(SCREEN_HEIGHT, SCREEN_WIDTH, 'Bem Vindo(a)!', theme=pygame_menu.themes.THEME_GREEN)
-menu.add_selector('Dificuldade :', [('Fácil', 0), ('Normal', 1), ('Difícil', 2)], onchange=set_difficulty)
-menu.add_button('Jogar', start_the_game)
-menu.add_button('Sair', pygame_menu.events.EXIT)
-menu.mainloop(screen)
+# menu = pygame_menu.Menu(SCREEN_HEIGHT, SCREEN_WIDTH, 'Bem Vindo(a)!', theme=pygame_menu.themes.THEME_GREEN)
+# menu.add_selector('Dificuldade :', [('Fácil', 0), ('Normal', 1), ('Difícil', 2)], onchange=set_difficulty)
+# menu.add_button('Jogar', start_the_game)
+# menu.add_button('Sair', pygame_menu.events.EXIT)
+# menu.mainloop(screen)
