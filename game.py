@@ -375,8 +375,8 @@ def start_the_game():
 
 # REDE NEURAL
 data = []
-for i  in range(0, 100, 1):
-    data.append([random.randint(1,500), random.randint(1,300), random.randint(110, 350), random.randint(0, 1)])
+for i  in range(0, 1000, 1):
+    data.append([random.randint(1,500), random.randint(1,300), random.randint(110, 350), random.choices([0, 1], [70, 30], k=1)[0] ])
 
 mlp = MyMLPClassifier()
 mlp.set_data(pd.DataFrame(data, columns=['altura','distancia','centerpipe','acao']))
