@@ -16,7 +16,8 @@
 
 1. Criando ambiente virtual e inicializando;
 2. Instalando dependências;
-3. Executando o jogo.
+3. Craindo estrutura de pastas;
+4. Executando o jogo.
 
 ### Criando ambiente virtual e inicializando
 ```
@@ -27,6 +28,11 @@ source env/bin/activate
 ### Instalando dependências
 ```
 pip instal -r requirements.txt
+```
+
+### Craindo estrutura de pastas
+```
+mkdir models
 ```
 
 ### Executando o jogo
