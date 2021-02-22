@@ -12,6 +12,9 @@
 
 # flappy-bird-ia
 
+![Gif](https://raw.githubusercontent.com/rauanisanfelice/flappy-bird-ia/develop/assets/game.gif)
+
+
 ## Instruções
 
 1. Criando ambiente virtual e inicializando;
