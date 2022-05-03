@@ -14,31 +14,19 @@
 
 ![Gif](https://raw.githubusercontent.com/rauanisanfelice/flappy-bird-ia/develop/assets/game.gif)
 
-
 ## Instruções
 
-1. Criando ambiente virtual e inicializando;
-2. Instalando dependências;
-3. Craindo estrutura de pastas;
-4. Executando o jogo.
+1. Criando ambiente;
+2. Executando o jogo.
 
-### Criando ambiente virtual e inicializando
-```
-virtualenv -p python3 env
-source env/bin/activate
-```
+### Criando ambiente
 
-### Instalando dependências
-```
-pip instal -r requirements.txt
-```
-
-### Craindo estrutura de pastas
-```
-mkdir models
+```bash
+make install
 ```
 
 ### Executando o jogo
-```
-python ./game.py
+
+```bash
+make run
 ```
